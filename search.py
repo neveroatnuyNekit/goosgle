@@ -1,7 +1,8 @@
 import json,re
 from itertools import combinations
 from collections import defaultdict
-
+from urllib.parse import urlparse
+from fuzzywuzzy import fuzz
 
 GET_OUT = {
     "for",
@@ -35,9 +36,54 @@ def make_ok(text:str):
         return text
     return None
 
+def is_like_url(query, url, threshold=70):
+    parsed_url = urlparse(url)
+    domain_parts = parsed_url.netloc.split('.')
+    path_parts = parsed_url.path.strip('/').split('/')
+    url_keywords = []
+    url_keywords.extend(domain_parts[:-1]) 
+    url_keywords.extend(path_parts)
+    url_keywords = [part for part in url_keywords if part] 
+    query_words = re.findall(r'\w+', query.lower())
+    
+    for word in query_words:
+        for part in url_keywords:
+            similarity = fuzz.ratio(word.lower(), part.lower())
+            if similarity >= threshold:
+                return True
+    return False
+
+def find_most_similar_url(query, urls, threshold=70):
+    best_match = None
+    best_score = 0
+    
+    for url in range(len(urls)):
+        score = 0
+        parsed_url = urlparse(urls[url])
+        domain_parts = parsed_url.netloc.split('.')
+        path_parts = parsed_url.path.strip('/').split('/')
+        
+        url_keywords = []
+        url_keywords.extend(domain_parts[:-1])
+        url_keywords.extend(path_parts)
+        url_keywords = [part for part in url_keywords if part]
+        
+        query_words = re.findall(r'\w+', query.lower())
+        
+        for word in query_words:
+            for part in url_keywords:
+                current_score = fuzz.ratio(word.lower(), part.lower())
+                if current_score > score:
+                    score = current_score
+        
+        if score > best_score and score >= threshold:
+            best_score = score
+            best_match = url
+    
+    return best_match
 
 def main():
-    req = "example"
+    req = "cookies 2 cash"
 
     text = req
 
@@ -79,10 +125,23 @@ def main():
                     result.append(elem)
                     element_counts[elem] = r  # Запоминаем, в скольки списках встретился
 
-    # Сортируем результат по убыванию количества вхождений
-    result.sort(key=lambda x: -element_counts[x])
+    # print(element_counts)
+    reit = [element_counts[x] for x in result]
 
+    reit[int(find_most_similar_url(text,result))] += 5
+    # print(reit)
+    # Сортируем результат по убыванию количества вхождений
+    # result.sort(key=lambda x: -reit[int(x)])
+    # paired = sorted(zip(reit, result), key=lambda x: x[0])
+
+    # Извлекаем отсортированные элементы b
+    # sorted_b = [item[1] for item in paired]
+    result = [x for _, x in sorted(zip(reit, result), key=lambda pair: pair[0])]
+
+    # print()
     print(result)
+    # print()
+    
 
 main()
 
